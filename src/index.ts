@@ -690,6 +690,42 @@ export default class SwissEPH {
      *   provided, it defaults to a path relative to the current module.
      * @returns A Promise that resolves to an initialized `SwissEPH` instance.
      */
+    /**
+     * Initialize SwissEPH with a pre-compiled WASM module (for Cloudflare Workers).
+     * This method is specifically designed for environments like Cloudflare Workers
+     * where dynamic WASM loading is not supported, but static WASM imports are.
+     * 
+     * @param wasmModule A pre-compiled WebAssembly.Module imported statically
+     * @returns A Promise that resolves to an initialized `SwissEPH` instance
+     * 
+     * @example
+     * ```typescript
+     * import SwissEPH from 'sweph-wasm';
+     * import wasmModule from './swisseph.wasm';
+     * 
+     * const swe = await SwissEPH.initWithModule(wasmModule);
+     * ```
+     */
+    public static async initWithModule(wasmModule: WebAssembly.Module): Promise<SwissEPH> {
+        const { default: Module } = await import("./wasm/swisseph");
+
+        /** Swisseph Emscripten Module instance */
+        const wasm = await Module({
+            instantiateWasm: (imports: any, successCallback: any) => {
+                // Use the pre-compiled WASM module instead of fetching/compiling
+                WebAssembly.instantiate(wasmModule, imports).then((instance) => {
+                    successCallback(instance, wasmModule);
+                }).catch((err) => {
+                    console.error('Failed to instantiate WASM module:', err);
+                    throw err;
+                });
+                return {}; // Emscripten expects an empty object to be returned
+            },
+        });
+
+        return new SwissEPH(wasm);
+    }
+
     public static async init(wasm_path?: string): Promise<SwissEPH> {
         // Dynamically import the Emscripten-generated Module function.
         // The path to the JS wrapper depends on your project structure.
@@ -704,9 +740,19 @@ export default class SwissEPH {
                     if (wasm_path) {
                         return wasm_path;
                     } else {
-                        // Using `import.meta.url` is a modern way to resolve paths relative to the current module.
-                        return new URL("wasm/swisseph.wasm", import.meta.url)
-                            .href;
+                        // Check if import.meta.url is available (not available in Cloudflare Workers)
+                        if (typeof import.meta !== 'undefined' && import.meta.url) {
+                            // Using `import.meta.url` is a modern way to resolve paths relative to the current module.
+                            return new URL("wasm/swisseph.wasm", import.meta.url)
+                                .href;
+                        } else {
+                            // Fallback for environments without import.meta.url (like Cloudflare Workers)
+                            // Throw an error instructing to use initWithModule instead
+                            throw new Error(
+                                'import.meta.url is not available in this environment (e.g., Cloudflare Workers). ' +
+                                'Please use SwissEPH.initWithModule(wasmModule) instead with a statically imported WASM module.'
+                            );
+                        }
                     }
                 }
                 // For other files (like .data files), use the default Emscripten logic.

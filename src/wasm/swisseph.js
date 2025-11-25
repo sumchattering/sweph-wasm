@@ -31,7 +31,14 @@ async function Module(moduleArg = {}) {
 
     // N.b. Electron.js environment is simultaneously a NODE-environment, but
     // also a web environment.
+    // PATCH: Cloudflare Workers provides process but not import.meta.url
+    // Detect Cloudflare Workers and treat as WORKER, not NODE
+    var IS_CLOUDFLARE_WORKERS = 
+        typeof navigator !== 'undefined' && 
+        navigator.userAgent === 'Cloudflare-Workers';
+    
     var ENVIRONMENT_IS_NODE =
+        !IS_CLOUDFLARE_WORKERS &&
         typeof process == "object" &&
         process.versions?.node &&
         process.type != "renderer";
