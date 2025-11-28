@@ -33,10 +33,10 @@ export default {
         },
     ],
     plugins: [
-        resolve({ browser: true, preferBuiltins: false }),
         typescript({
             tsconfig: "./tsconfig.prod.json",
         }),
+        resolve({ browser: true, preferBuiltins: false }),
         copy({
             targets: [
                 { src: "src/wasm/swisseph.d.ts", dest: "dist/wasm" },
